@@ -18,6 +18,7 @@ const kernel = [
 
 class App {
     ctx:CanvasRenderingContext2D;
+    ctx3d: WebGLRenderingContext;
     img:HTMLImageElement;
     c: Concentration[][] = [];
 
@@ -35,6 +36,72 @@ class App {
         this.ctx = ctx;
         this.img = img;
     }
+
+    setupGL() {
+        const canvas = document.getElementById('graygl') as HTMLCanvasElement;
+        if (!canvas.getContext) {
+            return;
+        }
+        const gl = canvas.getContext('webgl');
+        /*
+        const img = new Image();
+        img.onload = () => this.imgOnLoad();
+        img.src = 'img/diffusion.jpg';
+        */
+
+        const fSource = `
+            void main()
+            {
+                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            }
+        `;
+        const fShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fShader, fSource);
+        gl.compileShader(fShader);
+
+        const vSource = `
+        attribute vec4 a_Position;
+
+        void main()
+        {
+            gl_Position = a_Position;
+        }`;
+        const vShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vShader, vSource);
+        gl.compileShader(vShader);
+
+        var shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vShader);
+        gl.attachShader(shaderProgram, fShader);
+        gl.linkProgram(shaderProgram);
+        gl.useProgram(shaderProgram); 
+
+        const vertices = new Float32Array([
+            -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, -0.5
+        ]);
+        const vertexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        const a_Position = gl.getAttribLocation(shaderProgram, 'a_Position');
+        if (a_Position < 0)
+        {
+            console.log('Failed to get the storage location of a_Position');
+            return -1;
+        }
+        // Assign the buffer object to a_Position variable
+        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+
+        // Enable the assignment to a_Position variable
+        gl.enableVertexAttribArray(a_Position);
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        this.ctx3d = gl;
+    }
+
 
     imgOnLoad() {
         const {ctx, img} = this;
@@ -93,9 +160,9 @@ class App {
         }
 
         ctx.putImageData(image, 0, 0);
-        console.log(new Date(), time);
 
-        window.requestAnimationFrame(() => this.draw());
+        // window.requestAnimationFrame(() => this.draw());
+        // console.log(window.requestAnimationFrame);
     }
 
     conv (i: number, j: number, isA: boolean): number {
