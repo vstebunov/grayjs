@@ -50,9 +50,14 @@ class App {
         */
 
         const fSource = `
+            precision mediump float;
+
+            uniform sampler2D u_Sampler;
+            varying vec2 v_TexCoord;
+
             void main()
             {
-                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                gl_FragColor = texture2D(u_Sampler, v_TexCoord);
             }
         `;
         const fShader = gl.createShader(gl.FRAGMENT_SHADER);
@@ -61,11 +66,15 @@ class App {
 
         const vSource = `
         attribute vec4 a_Position;
+        attribute vec2 a_TexCoord;
+        varying vec2 v_TexCoord;
 
         void main()
         {
             gl_Position = a_Position;
-        }`;
+            v_TexCoord = a_TexCoord;
+        }
+        `;
         const vShader = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(vShader, vSource);
         gl.compileShader(vShader);
@@ -77,8 +86,13 @@ class App {
         gl.useProgram(shaderProgram); 
 
         const vertices = new Float32Array([
-            -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, -0.5
+            -1, 1, 0.0, 1.0,
+            -1, -1, 0.0, 0.0,
+            1, 1, 1.0, 1.0,
+            1, -1, 1.0, 0.0,
         ]);
+        var FSIZE = vertices.BYTES_PER_ELEMENT;
+    
         const vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -90,18 +104,77 @@ class App {
             return -1;
         }
         // Assign the buffer object to a_Position variable
-        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+        // gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, FSIZE * 4, 0);
 
         // Enable the assignment to a_Position variable
         gl.enableVertexAttribArray(a_Position);
 
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        // Get the storage location of a_TexCoord
+        var a_TexCoord = gl.getAttribLocation(shaderProgram, 'a_TexCoord');
+    
+        if (a_TexCoord < 0)
+        {
+            console.log('Failed to get the storage location of a_TexCoord');
+            return -1;
+        }
+        // Assign the buffer object to a_TexCoord variable
+        gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, FSIZE * 4, FSIZE * 2);
+        gl.enableVertexAttribArray(a_TexCoord);  // Enable the assignment of the buffer object
+
+        this.initTexture(gl, shaderProgram);
+
+        //gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        //gl.clear(gl.COLOR_BUFFER_BIT);
+        //gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
         this.ctx3d = gl;
     }
 
+    initTexture (gl, shaderProgram) {
+        let texture = gl.createTexture();
+        if (!texture) {
+            console.log('Failed to create texture object');
+            return false;
+        }
+
+        let u_Sampler = gl.getUniformLocation(shaderProgram, 'u_Sampler');
+        if (!u_Sampler) {
+            console.log('Failed to get the storage location of u_Sampler');
+            return false;
+        }
+        
+        let image = new Image();
+        if (!image) {
+            console.log('Failed to create image object');
+            return false;
+        }
+
+        image.onload = () => {
+            this.loadTexture(gl, 4, texture, u_Sampler, image);
+        };
+        image.src = 'img/diffusion.jpg';
+
+        return true;
+    }
+
+    loadTexture(gl, n, texture, u_Sampler, image) {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+        // these two lines needed in WebGL1 but not WebGL2 if the image is not
+        // power of 2 in both dimension
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+        gl.uniform1i(u_Sampler, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, n);
+    }
 
     imgOnLoad() {
         const {ctx, img} = this;
