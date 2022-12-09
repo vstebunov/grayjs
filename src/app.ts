@@ -43,21 +43,24 @@ class App {
             return;
         }
         const gl = canvas.getContext('webgl');
-        /*
-        const img = new Image();
-        img.onload = () => this.imgOnLoad();
-        img.src = 'img/diffusion.jpg';
-        */
+
+        /** site to convert color: https://airtightinteractive.com/util/hex-to-glsl/*/
 
         const fSource = `
             precision mediump float;
 
             uniform sampler2D u_Sampler;
             varying vec2 v_TexCoord;
+            vec3 color1 = vec3(0.275,0.259,0.216);
+            vec3 color2 = vec3(0.973,0.925,0.761);
+            vec3 canvas = vec3(0.0);
+            vec4 a_FragColor;
 
             void main()
             {
-                gl_FragColor = texture2D(u_Sampler, v_TexCoord);
+                a_FragColor = texture2D(u_Sampler, v_TexCoord);
+                canvas = mix(color1, color2, a_FragColor.g);
+                gl_FragColor = vec4(canvas, 1.0);
             }
         `;
         const fShader = gl.createShader(gl.FRAGMENT_SHADER);
